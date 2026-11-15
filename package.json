@@ -51,7 +51,7 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "YOUR_GITHUB_USERNAME",
+        "owner": "sriyamp5",
         "repo": "sriya-motors-pos"
       }
     ]
