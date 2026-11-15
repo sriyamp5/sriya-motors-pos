@@ -1,0 +1,86 @@
+{
+  "name": "sriya-motors-pos",
+  "productName": "Sriya Motors POS",
+  "version": "1.0.0",
+  "description": "Point of sale and inventory system for Sriya Motors (Pvt) Ltd vehicle spare parts shop.",
+  "author": "Sriya Motors (Pvt) Ltd",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "concurrently -k -n server,client -c blue,magenta \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "node --watch-path=server --watch-path=shared server/dev.js",
+    "dev:client": "vite --config client/vite.config.js",
+    "dev:electron": "cross-env ELECTRON_DEV_URL=http://localhost:5173 electron .",
+    "build:client": "vite build --config client/vite.config.js",
+    "start": "npm run build:client && electron .",
+    "test": "node --env-file-if-exists=.env --test --test-concurrency=1 \"server/tests/**/*.test.js\"",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "db:seed-demo": "node --env-file-if-exists=.env server/scripts/seedDemo.js",
+    "dist": "npm run build:client && electron-builder --win",
+    "release": "npm run build:client && electron-builder --win --publish always"
+  },
+  "build": {
+    "appId": "lk.sriyamotors.pos",
+    "productName": "Sriya Motors POS",
+    "artifactName": "SriyaMotorsPOS-Setup-${version}.${ext}",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**/*",
+      "server/**/*",
+      "!server/tests/**",
+      "shared/**/*",
+      "client/dist/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Sriya Motors POS"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "YOUR_GITHUB_USERNAME",
+        "repo": "sriya-motors-pos"
+      }
+    ]
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "electron-log": "^5.4.4",
+    "electron-updater": "^6.8.9",
+    "express": "^5.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "mysql2": "^3.24.6",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@fontsource-variable/inter": "^5.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "concurrently": "^10.0.6",
+    "cross-env": "^10.1.0",
+    "electron": "^45.0.0",
+    "electron-builder": "^26.15.3",
+    "eslint": "^10.13.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
+    "lucide-react": "^1.61.0",
+    "prettier": "^3.9.10",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-router-dom": "^7.18.4",
+    "vite": "^8.3.5"
+  }
+}

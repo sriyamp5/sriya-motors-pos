@@ -1,0 +1,653 @@
+/**
+ * Loads sample brands, vehicle models, suppliers and spare parts for
+ * testing and training. Intended for a development or demo database only.
+ *
+ * Usage: npm run db:seed-demo
+ */
+import { initDatabase, query, queryOne, transaction, shutdownDatabase, getDbState } from '../db/database.js';
+import { runMigrations } from '../db/migrator.js';
+import { seedBaseData } from '../db/seed.js';
+import { applyStockChange } from '../modules/stock/stockLedger.js';
+
+const BRANDS = [
+  ['Toyota Genuine', 'Japan'],
+  ['Denso', 'Japan'],
+  ['NGK', 'Japan'],
+  ['Bosch', 'Germany'],
+  ['Sakura', 'Japan'],
+  ['Akebono', 'Japan'],
+  ['KYB', 'Japan'],
+  ['Exedy', 'Japan'],
+  ['Koyo', 'Japan'],
+  ['Mobil', 'USA'],
+  ['Castrol', 'UK'],
+  ['Bajaj Genuine', 'India'],
+  ['TVS Genuine', 'India'],
+  ['Gates', 'USA'],
+];
+
+const MODELS = {
+  Toyota: [
+    ['Axio', 'CAR'],
+    ['Premio', 'CAR'],
+    ['Vitz', 'CAR'],
+    ['Aqua', 'CAR'],
+    ['KDH Hiace', 'VAN'],
+    ['Hilux', 'CAB'],
+    ['Corolla 121', 'CAR'],
+  ],
+  Suzuki: [
+    ['Wagon R', 'CAR'],
+    ['Alto', 'CAR'],
+    ['Every', 'VAN'],
+    ['Swift', 'CAR'],
+  ],
+  Honda: [
+    ['Fit', 'CAR'],
+    ['Vezel', 'SUV'],
+    ['Grace', 'CAR'],
+  ],
+  Nissan: [
+    ['Sunny N16', 'CAR'],
+    ['X-Trail', 'SUV'],
+    ['Caravan E25', 'VAN'],
+  ],
+  Bajaj: [
+    ['RE 4S', 'THREE_WHEELER'],
+    ['Pulsar 150', 'MOTORCYCLE'],
+    ['Discover 125', 'MOTORCYCLE'],
+  ],
+  TVS: [
+    ['King', 'THREE_WHEELER'],
+    ['Apache 160', 'MOTORCYCLE'],
+  ],
+  Mitsubishi: [
+    ['Lancer', 'CAR'],
+    ['Montero', 'SUV'],
+  ],
+};
+
+const SUPPLIERS = [
+  ['Lanka Auto Distributors', 'Sunil Fernando', '0112345678', 'Colombo 10'],
+  ['Pettah Motor Spares', 'Ruwan Silva', '0112456789', 'Pettah, Colombo 11'],
+  ['DIMO Parts', 'Sales Desk', '0112449797', 'Colombo 14'],
+];
+
+// name, part number, barcode, category, brand, type, unit, cost, price, stock, reorder, rack, warranty, fits
+const PRODUCTS = [
+  [
+    'Oil Filter',
+    '90915-YZZE1',
+    '4987654300011',
+    'Filters',
+    'Toyota Genuine',
+    'GENUINE',
+    'PCS',
+    1000,
+    1500,
+    24,
+    6,
+    'A-01',
+    null,
+    [
+      ['Toyota', 'Axio'],
+      ['Toyota', 'Premio'],
+      ['Toyota', 'Corolla 121'],
+    ],
+  ],
+  [
+    'Oil Filter',
+    'C-1139',
+    '4987654300028',
+    'Filters',
+    'Sakura',
+    'AFTERMARKET',
+    'PCS',
+    650,
+    950,
+    30,
+    8,
+    'A-01',
+    null,
+    [
+      ['Toyota', 'Axio'],
+      ['Toyota', 'Vitz'],
+    ],
+  ],
+  [
+    'Air Filter',
+    '17801-21050',
+    '4987654300035',
+    'Filters',
+    'Toyota Genuine',
+    'GENUINE',
+    'PCS',
+    2200,
+    3200,
+    10,
+    3,
+    'A-02',
+    null,
+    [
+      ['Toyota', 'Axio'],
+      ['Toyota', 'Aqua'],
+    ],
+  ],
+  [
+    'Air Filter',
+    'A-1167',
+    '4987654300042',
+    'Filters',
+    'Sakura',
+    'AFTERMARKET',
+    'PCS',
+    1300,
+    1900,
+    12,
+    4,
+    'A-02',
+    null,
+    [['Suzuki', 'Wagon R']],
+  ],
+  [
+    'Cabin Filter',
+    '87139-52040',
+    '4987654300059',
+    'Filters',
+    'Denso',
+    'OEM',
+    'PCS',
+    1600,
+    2400,
+    8,
+    3,
+    'A-03',
+    null,
+    [
+      ['Toyota', 'Vitz'],
+      ['Toyota', 'Aqua'],
+    ],
+  ],
+  [
+    'Fuel Filter',
+    '23390-0L041',
+    '4987654300066',
+    'Filters',
+    'Toyota Genuine',
+    'GENUINE',
+    'PCS',
+    4200,
+    5900,
+    5,
+    2,
+    'A-04',
+    null,
+    [
+      ['Toyota', 'KDH Hiace'],
+      ['Toyota', 'Hilux'],
+    ],
+  ],
+  [
+    'Spark Plug (Iridium)',
+    'IFR6T11',
+    '4987654300073',
+    'Electrical',
+    'NGK',
+    'OEM',
+    'PCS',
+    1800,
+    2600,
+    40,
+    12,
+    'B-01',
+    null,
+    [
+      ['Toyota', 'Axio'],
+      ['Honda', 'Fit'],
+    ],
+  ],
+  [
+    'Spark Plug',
+    'BPR6ES',
+    '4987654300080',
+    'Electrical',
+    'NGK',
+    'AFTERMARKET',
+    'PCS',
+    380,
+    600,
+    60,
+    20,
+    'B-01',
+    null,
+    [
+      ['Bajaj', 'RE 4S'],
+      ['TVS', 'King'],
+    ],
+  ],
+  [
+    'Front Brake Pads',
+    '04465-52260',
+    '4987654300097',
+    'Brake System',
+    'Akebono',
+    'OEM',
+    'SET',
+    5200,
+    7500,
+    9,
+    3,
+    'C-01',
+    6,
+    [
+      ['Toyota', 'Axio'],
+      ['Toyota', 'Premio'],
+    ],
+  ],
+  [
+    'Rear Brake Shoes',
+    'K2289',
+    '4987654300103',
+    'Brake System',
+    'Akebono',
+    'OEM',
+    'SET',
+    3800,
+    5500,
+    6,
+    2,
+    'C-02',
+    6,
+    [['Toyota', 'Vitz']],
+  ],
+  [
+    'Brake Fluid DOT 4 (500ml)',
+    'DOT4-500',
+    '4987654300110',
+    'Lubricants & Fluids',
+    'Bosch',
+    'AFTERMARKET',
+    'BOTTLE',
+    900,
+    1350,
+    18,
+    6,
+    'D-01',
+    null,
+    [],
+  ],
+  [
+    'Engine Oil 5W-30 (4L)',
+    'MOB-5W30-4',
+    '4987654300127',
+    'Lubricants & Fluids',
+    'Mobil',
+    'AFTERMARKET',
+    'BOTTLE',
+    9800,
+    12500,
+    14,
+    5,
+    'D-02',
+    null,
+    [],
+  ],
+  [
+    'Engine Oil 20W-50 (1L)',
+    'CAS-2050-1',
+    '4987654300134',
+    'Lubricants & Fluids',
+    'Castrol',
+    'AFTERMARKET',
+    'BOTTLE',
+    1900,
+    2500,
+    2,
+    6,
+    'D-02',
+    null,
+    [],
+  ],
+  [
+    'Front Shock Absorber',
+    '339217',
+    '4987654300141',
+    'Suspension & Steering',
+    'KYB',
+    'OEM',
+    'PCS',
+    11500,
+    16000,
+    4,
+    2,
+    'E-01',
+    12,
+    [['Toyota', 'Axio']],
+  ],
+  [
+    'Rack End',
+    '45503-09130',
+    '4987654300158',
+    'Suspension & Steering',
+    'Toyota Genuine',
+    'GENUINE',
+    'PCS',
+    4100,
+    5800,
+    3,
+    2,
+    'E-02',
+    null,
+    [['Toyota', 'Premio']],
+  ],
+  [
+    'Clutch Plate',
+    'TYD-117',
+    '4987654300165',
+    'Clutch & Transmission',
+    'Exedy',
+    'OEM',
+    'PCS',
+    8900,
+    12500,
+    5,
+    2,
+    'F-01',
+    6,
+    [['Toyota', 'KDH Hiace']],
+  ],
+  [
+    'Wheel Bearing (Front)',
+    '90369-38011',
+    '4987654300172',
+    'Bearings & Seals',
+    'Koyo',
+    'OEM',
+    'PCS',
+    3600,
+    5200,
+    7,
+    2,
+    'F-02',
+    null,
+    [['Toyota', 'Corolla 121']],
+  ],
+  [
+    'Fan Belt',
+    '7PK1520',
+    '4987654300189',
+    'Belts & Hoses',
+    'Gates',
+    'AFTERMARKET',
+    'PCS',
+    2100,
+    3100,
+    0,
+    2,
+    'G-01',
+    null,
+    [['Toyota', 'Axio']],
+  ],
+  [
+    'Timing Belt',
+    '13568-19046',
+    '4987654300196',
+    'Belts & Hoses',
+    'Gates',
+    'AFTERMARKET',
+    'PCS',
+    4800,
+    6900,
+    3,
+    2,
+    'G-02',
+    null,
+    [['Toyota', 'Corolla 121']],
+  ],
+  [
+    'Radiator Cap',
+    '16401-72090',
+    '4987654300202',
+    'Cooling System',
+    'Denso',
+    'OEM',
+    'PCS',
+    750,
+    1200,
+    15,
+    5,
+    'H-01',
+    null,
+    [],
+  ],
+  [
+    'Water Pump',
+    'GWT-123A',
+    '4987654300219',
+    'Cooling System',
+    'Denso',
+    'OEM',
+    'PCS',
+    9200,
+    13500,
+    2,
+    2,
+    'H-02',
+    6,
+    [['Toyota', 'Hilux']],
+  ],
+  [
+    'Headlamp Bulb H4 12V',
+    'H4-12V-60/55',
+    '4987654300226',
+    'Electrical',
+    'Bosch',
+    'AFTERMARKET',
+    'PCS',
+    550,
+    850,
+    25,
+    8,
+    'B-03',
+    null,
+    [],
+  ],
+  [
+    'Wiper Blade 22"',
+    'WB-22',
+    '4987654300233',
+    'Body Parts',
+    'Bosch',
+    'AFTERMARKET',
+    'PCS',
+    1100,
+    1650,
+    12,
+    4,
+    'I-01',
+    null,
+    [],
+  ],
+  [
+    'Three-wheeler Clutch Cable',
+    'RE-CC-01',
+    '4987654300240',
+    'Clutch & Transmission',
+    'Bajaj Genuine',
+    'GENUINE',
+    'PCS',
+    420,
+    650,
+    35,
+    10,
+    'J-01',
+    null,
+    [['Bajaj', 'RE 4S']],
+  ],
+  [
+    'Brake Shoe (Three-wheeler)',
+    'RE-BS-02',
+    '4987654300257',
+    'Brake System',
+    'Bajaj Genuine',
+    'GENUINE',
+    'SET',
+    1350,
+    1950,
+    20,
+    6,
+    'J-02',
+    null,
+    [['Bajaj', 'RE 4S']],
+  ],
+  [
+    'Chain Sprocket Kit',
+    'APX-CSK',
+    '4987654300264',
+    'Clutch & Transmission',
+    'TVS Genuine',
+    'GENUINE',
+    'KIT',
+    5200,
+    7400,
+    4,
+    2,
+    'J-03',
+    null,
+    [['TVS', 'Apache 160']],
+  ],
+  [
+    'Oxygen Sensor (Used)',
+    '89465-52380',
+    null,
+    'Electrical',
+    'Denso',
+    'USED',
+    'PCS',
+    4500,
+    8000,
+    2,
+    1,
+    'K-01',
+    null,
+    [['Toyota', 'Vitz']],
+  ],
+  [
+    'Alternator (Reconditioned)',
+    '27060-21070',
+    null,
+    'Electrical',
+    'Denso',
+    'RECONDITIONED',
+    'PCS',
+    18000,
+    26000,
+    1,
+    1,
+    'K-02',
+    3,
+    [['Toyota', 'Axio']],
+  ],
+];
+
+async function waitUntilReady() {
+  await initDatabase(async () => {
+    await runMigrations();
+    await seedBaseData();
+  });
+  const state = getDbState();
+  if (state.status !== 'ready') throw new Error(state.message);
+}
+
+async function idByName(table, name) {
+  return (await queryOne(`SELECT id FROM ${table} WHERE name = ?`, [name]))?.id;
+}
+
+async function main() {
+  await waitUntilReady();
+  const existing = await queryOne('SELECT COUNT(*) AS total FROM products');
+  if (existing.total > 0) {
+    console.log('Products already exist. Demo data was not added.');
+    return;
+  }
+  const admin = await queryOne(`SELECT id FROM users WHERE role = 'ADMIN' ORDER BY id LIMIT 1`);
+
+  await query('INSERT IGNORE INTO brands (name, country) VALUES ?', [BRANDS]);
+  for (const [make, models] of Object.entries(MODELS)) {
+    const makeId = await idByName('vehicle_makes', make);
+    await query('INSERT IGNORE INTO vehicle_models (make_id, name, vehicle_type) VALUES ?', [
+      models.map(([n, t]) => [makeId, n, t]),
+    ]);
+  }
+  await query('INSERT IGNORE INTO suppliers (name, contact_person, phone, address) VALUES ?', [SUPPLIERS]);
+
+  for (const [
+    name,
+    partNumber,
+    barcode,
+    category,
+    brand,
+    partType,
+    unit,
+    cost,
+    price,
+    stock,
+    reorder,
+    rack,
+    warranty,
+    fits,
+  ] of PRODUCTS) {
+    await transaction(async (tx) => {
+      const categoryId = (await tx.queryOne('SELECT id FROM categories WHERE name = ?', [category])).id;
+      const brandId = (await tx.queryOne('SELECT id FROM brands WHERE name = ?', [brand]))?.id ?? null;
+      const result = await tx.query(
+        `INSERT INTO products (name, part_number, barcode, category_id, brand_id, part_type, unit, cost_price, selling_price,
+                               reorder_level, rack_location, warranty_months, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          name,
+          partNumber,
+          barcode,
+          categoryId,
+          brandId,
+          partType,
+          unit,
+          cost,
+          price,
+          reorder,
+          rack,
+          warranty,
+          admin.id,
+        ],
+      );
+      const id = result.insertId;
+      await tx.query('UPDATE products SET item_code = ? WHERE id = ?', [`SM${String(id).padStart(5, '0')}`, id]);
+      for (const [make, model] of fits) {
+        const vm = await tx.queryOne(
+          'SELECT vm.id FROM vehicle_models vm JOIN vehicle_makes mk ON mk.id = vm.make_id WHERE mk.name = ? AND vm.name = ?',
+          [make, model],
+        );
+        if (vm)
+          await tx.query('INSERT INTO product_fitments (product_id, vehicle_model_id) VALUES (?, ?)', [id, vm.id]);
+      }
+      if (stock > 0) {
+        await applyStockChange(tx, {
+          productId: id,
+          quantity: stock,
+          movementType: 'OPENING',
+          unitCost: cost,
+          userId: admin.id,
+          note: 'Opening stock',
+        });
+      }
+    });
+  }
+  console.log(`Added ${PRODUCTS.length} demo items, ${BRANDS.length} brands and ${SUPPLIERS.length} suppliers.`);
+}
+
+main()
+  .catch((error) => {
+    console.error('Demo data failed:', error.message);
+    process.exitCode = 1;
+  })
+  .finally(shutdownDatabase);

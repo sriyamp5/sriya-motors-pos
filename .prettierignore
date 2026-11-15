@@ -1,0 +1,6 @@
+node_modules
+client/dist
+release
+.data
+package-lock.json
+*.md

@@ -1,0 +1,119 @@
+/*
+ * Design tokens. Brand colours come from the Sriya Motors logo:
+ * navy blue (#0B3D91) as the primary colour and signal orange (#F2420D) as accent.
+ */
+
+:root,
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --bg: #f3f5f9;
+  --surface: #ffffff;
+  --surface-2: #f8fafc;
+  --surface-3: #eef2f7;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+
+  --text: #0f172a;
+  --text-2: #475569;
+  --text-3: #64748b;
+
+  --primary: #0b3d91;
+  --primary-hover: #092f70;
+  --primary-soft: #e8effb;
+  --primary-text: #0b3d91;
+  --on-primary: #ffffff;
+
+  --accent: #e8440f;
+  --accent-hover: #c9380a;
+  --accent-soft: #fdece6;
+  --accent-text: #c2380b;
+
+  --success: #15803d;
+  --success-soft: #e7f6ec;
+  --warning: #b45309;
+  --warning-soft: #fdf3e3;
+  --danger: #c81e1e;
+  --danger-hover: #a51717;
+  --danger-soft: #fdeaea;
+  --info: #0369a1;
+  --info-soft: #e6f3fa;
+
+  --sidebar-bg: #0b1f45;
+  --sidebar-text: #c3cee3;
+  --sidebar-muted: #8094b8;
+  --sidebar-active: rgba(255, 255, 255, 0.09);
+  --sidebar-hover: rgba(255, 255, 255, 0.05);
+
+  --chart-1: #2a5cc0;
+  --chart-2: #e8440f;
+  --chart-grid: #e2e8f0;
+
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 4px 14px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 18px 48px rgba(15, 23, 42, 0.18);
+  --overlay: rgba(15, 23, 42, 0.45);
+  --focus-ring: 0 0 0 3px rgba(11, 61, 145, 0.25);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #0b1220;
+  --surface: #111a2c;
+  --surface-2: #0f1727;
+  --surface-3: #1a2540;
+  --border: #22304d;
+  --border-strong: #31426a;
+
+  --text: #e6ebf5;
+  --text-2: #aab6cc;
+  --text-3: #8392ad;
+
+  --primary: #3b6fd8;
+  --primary-hover: #4f80e3;
+  --primary-soft: rgba(91, 141, 239, 0.15);
+  --primary-text: #82a8f5;
+  --on-primary: #ffffff;
+
+  --accent: #e8521f;
+  --accent-hover: #f26535;
+  --accent-soft: rgba(255, 106, 61, 0.14);
+  --accent-text: #ff8a63;
+
+  --success: #34c08b;
+  --success-soft: rgba(52, 192, 139, 0.14);
+  --warning: #f0b23e;
+  --warning-soft: rgba(240, 178, 62, 0.14);
+  --danger: #f26b5b;
+  --danger-hover: #f58476;
+  --danger-soft: rgba(242, 107, 91, 0.14);
+  --info: #5cb8e6;
+  --info-soft: rgba(92, 184, 230, 0.14);
+
+  --sidebar-bg: #08101f;
+  --sidebar-text: #b9c5dc;
+  --sidebar-muted: #6f80a3;
+  --sidebar-active: rgba(255, 255, 255, 0.07);
+  --sidebar-hover: rgba(255, 255, 255, 0.04);
+
+  --chart-1: #5b8def;
+  --chart-2: #f0602f;
+  --chart-grid: #22304d;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.55);
+  --overlay: rgba(2, 6, 15, 0.65);
+  --focus-ring: 0 0 0 3px rgba(91, 141, 239, 0.35);
+}
+
+:root {
+  --font: 'Inter Variable', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --sidebar-width: 240px;
+  --topbar-height: 60px;
+  --transition: 140ms ease;
+}
