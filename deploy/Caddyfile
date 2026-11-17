@@ -1,0 +1,19 @@
+# Caddy web server configuration for the hosted Sriya Motors POS.
+# Copy to /etc/caddy/Caddyfile and replace pos.example.com with the real address.
+#
+# Cloudflare sits in front of the server (orange cloud, SSL mode "Full (strict)").
+# The certificate below is the free Cloudflare Origin Certificate, valid for 15 years,
+# so nothing has to be renewed on the server.
+
+pos.example.com {
+	tls /etc/caddy/certs/origin.pem /etc/caddy/certs/origin.key
+
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+
+	reverse_proxy 127.0.0.1:4600
+}

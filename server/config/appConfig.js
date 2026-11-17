@@ -28,6 +28,14 @@ const DEFAULT_CONFIG = Object.freeze({
 let dataDir = null;
 let cached = null;
 
+/**
+ * True when the system runs as a hosted website (SRIYA_MODE=web) instead of
+ * inside the desktop application. Hosted mode takes all settings from the
+ * environment and disables features that only make sense on the shop laptop,
+ * such as the public database setup screen.
+ */
+export const isWebMode = () => process.env.SRIYA_MODE === 'web';
+
 export function getDataDir() {
   if (!dataDir) {
     dataDir = process.env.SRIYA_DATA_DIR || path.join(projectRoot, '.data');
@@ -49,6 +57,7 @@ function applyEnvironmentOverrides(config) {
   return {
     ...config,
     port: env.PORT ? Number(env.PORT) : config.port,
+    jwtSecret: env.JWT_SECRET || config.jwtSecret,
     db: {
       host: env.DB_HOST ?? config.db.host,
       port: env.DB_PORT ? Number(env.DB_PORT) : config.db.port,

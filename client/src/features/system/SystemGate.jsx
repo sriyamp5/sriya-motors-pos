@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Database, Loader2, RefreshCw, Settings2 } from 'lucide-react';
 import { DB_UNAVAILABLE_EVENT } from '@/api/client.js';
+import { setServerInfo } from '@/lib/runtime.js';
 import { Button } from '@/components/ui/index.js';
 import { DatabaseSetupPage } from './DatabaseSetupPage.jsx';
 import logo from '@/assets/logo.jpg';
@@ -27,10 +28,20 @@ export function SystemGate({ children }) {
     clearTimeout(timer.current);
     try {
       const next = await fetchStatus();
+      setServerInfo(next);
       setStatus(next);
       if (next.database.status !== 'ready') timer.current = setTimeout(check, POLL_MS);
     } catch {
-      setStatus((prev) => prev ?? { database: { status: 'connecting', message: 'Starting the POS service...' } });
+      // In a browser with no internet the hosted server cannot be reached at all.
+      const message = navigator.onLine
+        ? 'Starting the POS service...'
+        : 'No internet connection. The system will open as soon as the connection is back.';
+      // Keep an open system on screen; the connection banner explains the problem there.
+      setStatus((prev) =>
+        prev?.database?.status === 'ready'
+          ? prev
+          : { ...prev, database: { ...prev?.database, status: 'connecting', message } },
+      );
       timer.current = setTimeout(check, POLL_MS);
     }
   }, []);

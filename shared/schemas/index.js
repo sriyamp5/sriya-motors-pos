@@ -233,6 +233,11 @@ export const createSaleSchema = z
     customerPhone: phoneNumber('Customer phone'),
     vehicleNo: optionalText('Vehicle number', 20),
     notes: optionalText('Notes', 255),
+    // Set once per checkout by the till so a retried request cannot create a second sale.
+    clientRef: z
+      .string()
+      .regex(/^[A-Za-z0-9-]{8,40}$/, 'Invalid checkout reference')
+      .optional(),
   })
   .superRefine((sale, ctx) => {
     if (sale.paymentMethod === PAYMENT_METHODS.CREDIT && !sale.customerId) {

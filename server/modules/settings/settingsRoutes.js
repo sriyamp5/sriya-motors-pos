@@ -52,6 +52,18 @@ backupRoutes.post('/', async (req, res) => {
   res.status(201).json(result);
 });
 
+/** Downloads a backup so a copy can also be kept outside the server (e.g. on the shop laptop). */
+backupRoutes.get('/:fileName/download', async (req, res) => {
+  const filePath = await backupService.getBackupFile(req.params.fileName);
+  await recordAudit({
+    userId: req.user.id,
+    action: 'BACKUP_DOWNLOADED',
+    entityType: 'backup',
+    summary: `Downloaded backup ${req.params.fileName}`,
+  });
+  res.download(filePath);
+});
+
 const restoreSchema = z
   .object({
     fileName: z.string().max(200).optional(),

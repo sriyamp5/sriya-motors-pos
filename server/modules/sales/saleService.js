@@ -197,7 +197,34 @@ export async function listSales(filters, user) {
 
 /* ----------------------------------------------------------- Checkout --- */
 
+/** The sale already saved for this checkout reference, if any. */
+async function findSaleByClientRef(clientRef) {
+  if (!clientRef) return null;
+  return queryOne('SELECT id FROM sales WHERE client_ref = ?', [clientRef]);
+}
+
+/**
+ * Saves a sale. When the till repeats a checkout with the same reference
+ * (because the first reply was lost on the network) the original sale is
+ * returned and nothing is saved twice.
+ */
 export async function createSale(actor, data) {
+  const previous = await findSaleByClientRef(data.clientRef);
+  if (previous) return getSale(previous.id, actor.role);
+
+  try {
+    return await saveSale(actor, data);
+  } catch (error) {
+    // Two copies of the same request arrived at the same moment and the other one was saved first.
+    if (error.code === 'ER_DUP_ENTRY' && String(error.message).includes('uq_sales_client_ref')) {
+      const saved = await findSaleByClientRef(data.clientRef);
+      if (saved) return getSale(saved.id, actor.role);
+    }
+    throw error;
+  }
+}
+
+async function saveSale(actor, data) {
   const settings = await getSettings();
   const enforceCostFloor = actor.role !== ROLES.ADMIN && !settings.allowBelowCostSale;
 
@@ -271,11 +298,12 @@ export async function createSale(actor, data) {
     const hasOverride = lines.some((l) => l.priceOverridden);
     const header = await tx.query(
       `INSERT INTO sales
-         (customer_id, customer_name, customer_phone, vehicle_no, subtotal, item_discount_total, bill_discount,
-          total_amount, total_cost, payment_method, amount_tendered, change_amount, card_reference,
+         (client_ref, customer_id, customer_name, customer_phone, vehicle_no, subtotal, item_discount_total,
+          bill_discount, total_amount, total_cost, payment_method, amount_tendered, change_amount, card_reference,
           has_price_override, notes, cashier_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
+        data.clientRef ?? null,
         customer?.id ?? null,
         customer?.name ?? data.customerName,
         customer?.phone ?? data.customerPhone,

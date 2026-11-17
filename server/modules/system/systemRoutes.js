@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { parse } from '../../core/validation.js';
 import { badRequest, forbidden } from '../../core/errors.js';
 import { databaseConfigSchema } from '../../../shared/schemas/index.js';
-import { getConfig, saveDatabaseConfig } from '../../config/appConfig.js';
+import { getConfig, isWebMode, saveDatabaseConfig } from '../../config/appConfig.js';
 import { getDbState, testConnection, DB_STATUS } from '../../db/database.js';
 import { reinitialiseDatabase } from './startup.js';
 import { appVersion } from '../../version.js';
@@ -16,21 +16,37 @@ export const systemRoutes = Router();
 systemRoutes.get('/status', (_req, res) => {
   const { db } = getConfig();
   const state = getDbState();
+  const web = isWebMode();
   res.json({
     appName: 'Sriya Motors POS',
     version: appVersion,
-    database: {
-      ...state,
-      needsSetup: state.status === DB_STATUS.NOT_CONFIGURED || state.status === DB_STATUS.ERROR,
-      host: db.host,
-      port: db.port,
-      user: db.user,
-      name: db.database,
-    },
+    mode: web ? 'web' : 'desktop',
+    database: web
+      ? // Online, connection details stay private and the setup screen is never offered.
+        {
+          status: state.status,
+          message: state.status === DB_STATUS.READY ? 'Ready' : 'The system is starting. Please wait a moment.',
+          attempts: state.attempts,
+          needsSetup: false,
+        }
+      : {
+          ...state,
+          needsSetup: state.status === DB_STATUS.NOT_CONFIGURED || state.status === DB_STATUS.ERROR,
+          host: db.host,
+          port: db.port,
+          user: db.user,
+          name: db.database,
+        },
   });
 });
 
-systemRoutes.post('/database', async (req, res) => {
+/** The online server is configured through its environment file, never through the browser. */
+function desktopOnly(_req, _res, next) {
+  if (isWebMode()) throw forbidden('Database settings are managed on the server.');
+  next();
+}
+
+systemRoutes.post('/database', desktopOnly, async (req, res) => {
   // Connection settings can only be changed while the database is not connected,
   // so this public endpoint cannot be used to redirect a working system.
   if (getDbState().status === DB_STATUS.READY) {

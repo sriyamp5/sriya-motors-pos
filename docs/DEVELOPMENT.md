@@ -46,3 +46,15 @@ npm test
 ## Adding a new master list
 
 Simple reference tables can reuse `createMasterDataService` (server) and `MasterDataPage` (client). See categories and brands for examples.
+
+## Trying the online (web) mode locally
+
+The hosted version runs `server/web.js`, which sets `SRIYA_MODE=web`. To try it on the development laptop without touching the normal development database:
+
+```bash
+npm run build:client
+# PowerShell
+$env:DB_NAME="sriya_pos_web"; $env:JWT_SECRET="local-test-secret-at-least-32-characters"; $env:PORT="4650"; npm run start:web
+```
+
+Open http://127.0.0.1:4650. Differences from the desktop mode are listed in [ARCHITECTURE.md](ARCHITECTURE.md#two-ways-to-run-desktop-and-online); `server/tests/web.test.js` covers them. Server setup is in [HOSTING.md](HOSTING.md).

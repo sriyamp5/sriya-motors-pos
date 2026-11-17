@@ -76,6 +76,7 @@ server/
   tests/           end-to-end API tests
 shared/            constants, money maths and Zod schemas used by both sides
 build/             application icon
+deploy/            server files for the online version (service, Caddy, update script)
 docs/              documentation
 ```
 
@@ -83,7 +84,8 @@ docs/              documentation
 
 - [Architecture](docs/ARCHITECTURE.md): how the parts fit together and the main design decisions
 - [Database](docs/DATABASE.md): tables, money and stock rules, migrations
-- [Installing on the shop laptop](docs/INSTALLATION.md)
+- [Installing on the shop laptop](docs/INSTALLATION.md) (desktop app, works without internet)
+- [Hosting online](docs/HOSTING.md): server, domain and HTTPS step by step (Hetzner + Cloudflare)
 - [Releases and automatic updates](docs/RELEASES_AND_UPDATES.md)
 - [Backup and restore](docs/BACKUP_AND_RESTORE.md)
 - [User guide](docs/USER_GUIDE.md) for shop staff

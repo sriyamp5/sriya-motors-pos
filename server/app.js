@@ -4,6 +4,8 @@ import express from 'express';
 import { authenticate, requirePasswordChanged, requireRole } from './middleware/auth.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { serviceUnavailable } from './core/errors.js';
+import { securityHeaders, loginRateLimit } from './core/security.js';
+import { isWebMode } from './config/appConfig.js';
 import { getDbState, DB_STATUS } from './db/database.js';
 import { ROLES } from '../shared/constants.js';
 import { systemRoutes } from './modules/system/systemRoutes.js';
@@ -39,11 +41,18 @@ function requireDatabase(_req, _res, next) {
 export function createApp({ staticDir } = {}) {
   const app = express();
   app.disable('x-powered-by');
+
+  if (isWebMode()) {
+    // Behind the local reverse proxy (Caddy): trust it for the real client IP.
+    app.set('trust proxy', 'loopback');
+    app.use(securityHeaders({ staticDir }));
+  }
   app.use(express.json({ limit: '2mb' }));
 
   // Public endpoints.
   app.use('/api/system', systemRoutes);
   app.use('/api', requireDatabase);
+  if (isWebMode()) app.use('/api/auth/login', loginRateLimit());
   app.use('/api/auth', authRoutes);
 
   // Everything below requires a signed-in user who has set their own password.
@@ -74,9 +83,23 @@ export function createApp({ staticDir } = {}) {
   app.use('/api', notFoundHandler);
 
   if (staticDir && fs.existsSync(staticDir)) {
-    app.use(express.static(staticDir, { index: false, maxAge: '1h' }));
+    // Built file names contain a content hash, so they can be cached for a long
+    // time. index.html is never cached, so a new version is picked up on reload.
+    const assetsDir = `${path.sep}assets${path.sep}`;
+    app.use(
+      express.static(staticDir, {
+        index: false,
+        setHeaders: (res, filePath) => {
+          res.setHeader(
+            'Cache-Control',
+            filePath.includes(assetsDir) ? 'public, max-age=31536000, immutable' : 'no-cache',
+          );
+        },
+      }),
+    );
     // Client-side routing: unknown paths return the single page app.
     app.get(/^\/(?!api\/).*/, (_req, res) => {
+      res.setHeader('Cache-Control', 'no-cache');
       res.sendFile(path.join(staticDir, 'index.html'));
     });
   }

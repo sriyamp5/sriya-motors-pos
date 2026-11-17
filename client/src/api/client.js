@@ -12,6 +12,10 @@ const REQUEST_TIMEOUT_MS = 30000;
 
 export const AUTH_EXPIRED_EVENT = 'sm:auth-expired';
 export const DB_UNAVAILABLE_EVENT = 'sm:db-unavailable';
+/** Fired when the server could not be reached at all (no internet for the online version). */
+export const NETWORK_ERROR_EVENT = 'sm:network-error';
+/** Fired after any successful reply, so a connection warning can be cleared. */
+export const NETWORK_OK_EVENT = 'sm:network-ok';
 
 export class ApiError extends Error {
   constructor(message, { status = 0, code = 'UNKNOWN', fields = null, details = null } = {}) {
@@ -60,16 +64,16 @@ async function request(method, path, { body, params, signal } = {}) {
   } catch (error) {
     if (signal?.aborted) throw error;
     const timedOut = error.name === 'AbortError';
-    throw new ApiError(
-      timedOut
-        ? 'The request took too long. Please try again.'
-        : 'Cannot reach the POS service. Please wait a moment and try again.',
-      { code: timedOut ? 'TIMEOUT' : 'NETWORK' },
-    );
+    window.dispatchEvent(new CustomEvent(NETWORK_ERROR_EVENT));
+    let message = 'Cannot reach the POS service. Please wait a moment and try again.';
+    if (!navigator.onLine) message = 'No internet connection. Please check the internet and try again.';
+    else if (timedOut) message = 'The request took too long. Please check the internet connection and try again.';
+    throw new ApiError(message, { code: timedOut ? 'TIMEOUT' : 'NETWORK' });
   } finally {
     clearTimeout(timeout);
   }
 
+  window.dispatchEvent(new CustomEvent(NETWORK_OK_EVENT));
   if (response.status === 204) return null;
 
   let payload;
@@ -95,7 +99,31 @@ async function request(method, path, { body, params, signal } = {}) {
   return payload;
 }
 
+/** Downloads a file from the API (with the session token) and saves it through the browser. */
+async function download(path, fileName) {
+  const token = tokenStore.get();
+  let response;
+  try {
+    response = await fetch(buildUrl(path), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  } catch {
+    throw new ApiError('Cannot reach the POS service. Please check the internet connection.', { code: 'NETWORK' });
+  }
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new ApiError(payload?.error?.message || `Download failed (${response.status})`, {
+      status: response.status,
+    });
+  }
+  const url = URL.createObjectURL(await response.blob());
+  const link = Object.assign(document.createElement('a'), { href: url, download: fileName });
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
 export const api = {
+  download,
   get: (path, params, options) => request('GET', path, { params, ...options }),
   post: (path, body) => request('POST', path, { body: body ?? {} }),
   put: (path, body) => request('PUT', path, { body }),

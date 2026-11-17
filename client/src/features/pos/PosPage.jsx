@@ -134,8 +134,19 @@ function CartLine({ line, index, onChange, onRemove }) {
 export function PosPage() {
   const toast = useToast();
   const { isAdmin } = useAuth();
-  const { cart, totals, itemCount, problems, addProduct, updateLine, removeLine, setBillDiscount, setCustomer, clear } =
-    useCart();
+  const {
+    cart,
+    totals,
+    itemCount,
+    problems,
+    addProduct,
+    updateLine,
+    removeLine,
+    setBillDiscount,
+    setCustomer,
+    clear,
+    getCheckoutRef,
+  } = useCart();
   const searchRef = useRef(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -363,6 +374,7 @@ export function PosPage() {
         onClose={() => setCheckoutOpen(false)}
         cart={cart}
         totals={totals}
+        getCheckoutRef={getCheckoutRef}
         onCustomerChange={setCustomer}
         onCompleted={() => {
           clear();

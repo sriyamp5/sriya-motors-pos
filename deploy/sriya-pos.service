@@ -1,0 +1,30 @@
+# systemd service for the hosted Sriya Motors POS.
+# Install:  sudo cp deploy/sriya-pos.service /etc/systemd/system/
+#           sudo systemctl daemon-reload && sudo systemctl enable --now sriya-pos
+
+[Unit]
+Description=Sriya Motors POS (web)
+After=network-online.target mysql.service
+Wants=network-online.target mysql.service
+
+[Service]
+Type=simple
+User=sriya
+Group=sriya
+WorkingDirectory=/opt/sriya-pos
+ExecStart=/usr/bin/node server/web.js
+Environment=NODE_ENV=production
+# Dates on bills, reports and day close must be Sri Lankan time.
+Environment=TZ=Asia/Colombo
+Restart=always
+RestartSec=5
+
+# Hardening: the service can only write to its own data folder.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/sriya-pos
+
+[Install]
+WantedBy=multi-user.target

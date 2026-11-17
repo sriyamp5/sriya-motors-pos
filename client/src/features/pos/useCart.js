@@ -8,7 +8,26 @@ import { calculateBillTotals, lineNetTotal, toCents } from '@shared/money.js';
 
 const STORAGE_KEY = 'sm-pos-cart';
 
-const EMPTY_CART = { lines: [], billDiscount: '', customer: { name: '', phone: '', vehicleNo: '', id: null } };
+/**
+ * checkoutRef identifies one checkout of this exact bill. It is sent with the
+ * sale and kept until the bill changes or is cleared, so if the connection
+ * drops after the server saved the sale, trying again returns that same sale
+ * instead of charging the customer twice.
+ */
+const EMPTY_CART = {
+  lines: [],
+  billDiscount: '',
+  customer: { name: '', phone: '', vehicleNo: '', id: null },
+  checkoutRef: null,
+};
+
+function newCheckoutRef() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
+/** Any change to items or amounts makes it a different bill that needs a new reference. */
+const withChangedBill = (state) => ({ ...state, checkoutRef: null });
 
 function loadCart() {
   try {
@@ -46,24 +65,26 @@ function reducer(state, action) {
         (l) => l.productId === product.id && toCents(l.unitPrice) === toCents(product.sellingPrice),
       );
       if (existing) {
-        return {
+        return withChangedBill({
           ...state,
           lines: state.lines.map((l) =>
             l.key === existing.key ? { ...l, quantity: l.quantity + 1, stockQty: product.stockQty } : l,
           ),
-        };
+        });
       }
-      return { ...state, lines: [...state.lines, lineFromProduct(product)] };
+      return withChangedBill({ ...state, lines: [...state.lines, lineFromProduct(product)] });
     }
     case 'update':
-      return {
+      return withChangedBill({
         ...state,
         lines: state.lines.map((l) => (l.key === action.key ? { ...l, ...action.patch } : l)),
-      };
+      });
     case 'remove':
-      return { ...state, lines: state.lines.filter((l) => l.key !== action.key) };
+      return withChangedBill({ ...state, lines: state.lines.filter((l) => l.key !== action.key) });
     case 'setBillDiscount':
-      return { ...state, billDiscount: action.value };
+      return withChangedBill({ ...state, billDiscount: action.value });
+    case 'setCheckoutRef':
+      return { ...state, checkoutRef: action.value };
     case 'setCustomer':
       return { ...state, customer: { ...state.customer, ...action.patch } };
     case 'clear':
@@ -112,9 +133,18 @@ export function useCart() {
     return list;
   }, [cart.lines, totals.total]);
 
+  /** Returns the checkout reference for the current bill, creating it on the first attempt. */
+  const getCheckoutRef = useCallback(() => {
+    if (cart.checkoutRef) return cart.checkoutRef;
+    const value = newCheckoutRef();
+    dispatch({ type: 'setCheckoutRef', value });
+    return value;
+  }, [cart.checkoutRef]);
+
   return {
     cart,
     totals,
+    getCheckoutRef,
     itemCount,
     problems,
     addProduct: useCallback((product) => dispatch({ type: 'add', product }), []),

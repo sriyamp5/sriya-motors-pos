@@ -75,6 +75,26 @@ Each business area under `server/modules/` has a `*Routes.js` file (HTTP, parsin
 - `server/middleware/errorHandler.js` converts MySQL errors into plain messages (duplicate barcode, record in use, busy, lost connection) and hides unexpected errors behind a generic message while logging the full stack.
 - Validation errors return `422` with `details.fields`, which the UI shows under the matching inputs.
 
+## Two ways to run: desktop and online
+
+The same code runs in two modes. Nothing about the desktop app changes when the online version is used.
+
+| | Desktop app (default) | Online version (`SRIYA_MODE=web`) |
+|---|---|---|
+| Entry point | `electron/main.js` | `server/web.js` (`npm run start:web`) |
+| Where it runs | Shop laptop, API on 127.0.0.1 | Linux server behind Caddy and Cloudflare (HTTPS) |
+| Needs internet | Only for updates | Always |
+| Settings | Setup screen, `config.json` | Environment file `.env` only; setup screen disabled |
+| Printing | Silent, chosen printer | Browser print (silent with Chrome `--kiosk-printing`) |
+| Updates | GitHub Releases + update button | `deploy/update.sh` on the server |
+| Backups | Any folder, restore from file | Server folder (`BACKUP_DIR`), download from Settings |
+
+Online mode also adds security headers with a Content Security Policy (`server/core/security.js`) and a sign-in limit per IP address. The status endpoint does not show database details, and the server listens on a fixed port.
+
+Checkout requests carry a `clientRef`, a unique reference per bill (`sales.client_ref`, migration 002). If the reply to a sale is lost on the network, sending the same bill again returns the saved invoice and does not create a second sale. This works in both modes.
+
+See [HOSTING.md](HOSTING.md) for the server setup.
+
 ### Security
 
 - Passwords are hashed with bcrypt. JWT tokens expire after 14 hours.

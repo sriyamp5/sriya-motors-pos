@@ -111,7 +111,16 @@ function CreditCustomer({ customer, onChange, errors }) {
   );
 }
 
-export function CheckoutModal({ open, onClose, cart, totals, onCustomerChange, onCompleted, onFinished }) {
+export function CheckoutModal({
+  open,
+  onClose,
+  cart,
+  totals,
+  getCheckoutRef,
+  onCustomerChange,
+  onCompleted,
+  onFinished,
+}) {
   const toast = useToast();
   const { settings } = useShopSettings();
   const [method, setMethod] = useState(PAYMENT_METHODS.CASH);
@@ -176,6 +185,7 @@ export function CheckoutModal({ open, onClose, cart, totals, onCustomerChange, o
       customerName: cart.customer.name,
       customerPhone: cart.customer.phone,
       vehicleNo: cart.customer.vehicleNo,
+      clientRef: getCheckoutRef?.(),
     };
 
     const parsed = createSaleSchema.safeParse(payload);
@@ -200,7 +210,13 @@ export function CheckoutModal({ open, onClose, cart, totals, onCustomerChange, o
       onCompleted();
       if (printReceipt) print(sale);
     } catch (error) {
-      setSubmitError(error.message);
+      // After a lost connection it is safe to press Confirm again: the same bill is never saved twice.
+      const lostConnection = error.code === 'NETWORK' || error.code === 'TIMEOUT';
+      setSubmitError(
+        lostConnection
+          ? `${error.message} When the connection is back, press Confirm again. The bill will not be saved twice.`
+          : error.message,
+      );
       if (error.fields) setErrors(error.fields);
     } finally {
       setSubmitting(false);

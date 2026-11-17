@@ -365,6 +365,32 @@ test('day closing computes expected cash', async () => {
   assert.equal(again.status, 409);
 });
 
+test('repeating a checkout with the same reference does not create a second sale', async () => {
+  const body = {
+    items: [{ productId, quantity: 1, unitPrice: 1650 }],
+    paymentMethod: 'CASH',
+    clientRef: 'till-retry-0001',
+  };
+  const first = await api('POST', '/sales', { token: cashierToken, body });
+  assert.equal(first.status, 201, JSON.stringify(first.data));
+  const stockAfterFirst = (await api('GET', `/products/${productId}`, { token: adminToken })).data.stockQty;
+
+  // The same request again, as after a lost reply, and two copies at the same moment.
+  const results = await Promise.all([
+    api('POST', '/sales', { token: cashierToken, body }),
+    api('POST', '/sales', { token: cashierToken, body }),
+  ]);
+  for (const again of results) {
+    assert.equal(again.status, 201, JSON.stringify(again.data));
+    assert.equal(again.data.invoiceNo, first.data.invoiceNo);
+  }
+  const stockNow = (await api('GET', `/products/${productId}`, { token: adminToken })).data.stockQty;
+  assert.equal(stockNow, stockAfterFirst, 'stock is reduced only once');
+
+  const badRef = await api('POST', '/sales', { token: cashierToken, body: { ...body, clientRef: 'x' } });
+  assert.equal(badRef.status, 422);
+});
+
 test('items with history cannot be deleted, only deactivated', async () => {
   const del = await api('DELETE', `/products/${productId}`, { token: adminToken });
   assert.equal(del.status, 409);
@@ -400,4 +426,14 @@ test('backup and restore round-trip', async () => {
   assert.equal(product.data.isActive, false, 'state from the backup is back');
   const audit = await api('GET', '/audit-logs?search=PRICE_OVERRIDE', { token: adminToken });
   assert.ok(audit.data.total >= 1);
+
+  const download = await fetch(`${baseUrl}/api/backups/${backup.data.fileName}/download`, {
+    headers: { Authorization: `Bearer ${adminToken}` },
+  });
+  assert.equal(download.status, 200);
+  assert.ok((await download.arrayBuffer()).byteLength > 100);
+  const cashierDownload = await api('GET', `/backups/${backup.data.fileName}/download`, { token: cashierToken });
+  assert.equal(cashierDownload.status, 403);
+  const escape = await api('GET', `/backups/..%2F..%2Fconfig.json/download`, { token: adminToken });
+  assert.equal(escape.status, 404);
 });

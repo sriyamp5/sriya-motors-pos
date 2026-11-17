@@ -10,6 +10,8 @@ import { ROLE_LABELS } from '@shared/constants.js';
 import { Button } from '@/components/ui/index.js';
 import { NAVIGATION, PAGE_TITLES } from './navigation.js';
 import { UpdateBanner } from './UpdateBanner.jsx';
+import { ConnectionBanner } from './ConnectionBanner.jsx';
+import { serverVersion } from '@/lib/runtime.js';
 import { ChangePasswordModal } from '@/features/auth/ChangePasswordPage.jsx';
 import logoMark from '@/assets/logo-mark.png';
 
@@ -39,7 +41,8 @@ function useLowStockCount() {
 function Sidebar() {
   const { user } = useAuth();
   const lowStock = useLowStockCount();
-  const [version, setVersion] = useState(null);
+  // The desktop app reports its installed version; the online version gets it from the server.
+  const [version, setVersion] = useState(serverVersion);
 
   useEffect(() => {
     window.desktop
@@ -219,6 +222,7 @@ export function AppLayout() {
       <Sidebar />
       <div className="main">
         <Topbar />
+        <ConnectionBanner />
         <UpdateBanner />
         <main className={`content ${isPos ? 'flush' : ''}`}>
           <Outlet />

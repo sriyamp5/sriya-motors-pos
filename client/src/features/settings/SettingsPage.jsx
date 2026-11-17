@@ -13,6 +13,7 @@ import {
   WifiOff,
   FileUp,
 } from 'lucide-react';
+import { isOnlineVersion, serverVersion } from '@/lib/runtime.js';
 import { shopSettingsSchema } from '@shared/schemas/index.js';
 import { api } from '@/api/client.js';
 import { useApi } from '@/hooks/useApi.js';
@@ -124,7 +125,9 @@ function PrinterSettings({ form }) {
       <div className="stack" style={{ maxWidth: 560 }}>
         {!isDesktop && (
           <Alert tone="info">
-            Printer selection is available in the installed desktop application. In a browser the print dialog is used.
+            {isOnlineVersion()
+              ? 'In the online version the browser print dialog is used, and the printer is chosen there. To print without the dialog, open the system from the shortcut set up for silent printing (see the hosting guide).'
+              : 'Printer selection is available in the installed desktop application. In a browser the print dialog is used.'}
           </Alert>
         )}
         <SelectInput
@@ -232,6 +235,14 @@ function BackupSettings({ form }) {
     }
   };
 
+  const downloadBackup = async (fileName) => {
+    try {
+      await api.download(`/backups/${encodeURIComponent(fileName)}/download`, fileName);
+    } catch (error) {
+      toast.fromError(error, 'Download failed');
+    }
+  };
+
   const chooseFolder = async () => {
     const folder = await window.desktop?.selectFolder();
     if (folder) form.setValue('backupDir', folder);
@@ -247,20 +258,27 @@ function BackupSettings({ form }) {
       <div className="settings-grid">
         <Card title="Backup settings" icon={DatabaseBackup}>
           <div className="stack">
-            <div className="row" style={{ alignItems: 'flex-end' }}>
-              <TextInput
-                className="grow"
-                label="Backup folder"
-                placeholder="Default folder in the application data"
-                hint="Choose a folder on a pen drive or external disk for extra safety."
-                {...form.bind('backupDir')}
-              />
-              {isDesktop && (
-                <Button icon={FolderOpen} onClick={chooseFolder} style={{ marginBottom: 22 }}>
-                  Browse
-                </Button>
-              )}
-            </div>
+            {isOnlineVersion() ? (
+              <Alert tone="info">
+                Backups are stored on the server. Use <strong>Download</strong> in the list below to keep an extra copy
+                on this computer or a pen drive.
+              </Alert>
+            ) : (
+              <div className="row" style={{ alignItems: 'flex-end' }}>
+                <TextInput
+                  className="grow"
+                  label="Backup folder"
+                  placeholder="Default folder in the application data"
+                  hint="Choose a folder on a pen drive or external disk for extra safety."
+                  {...form.bind('backupDir')}
+                />
+                {isDesktop && (
+                  <Button icon={FolderOpen} onClick={chooseFolder} style={{ marginBottom: 22 }}>
+                    Browse
+                  </Button>
+                )}
+              </div>
+            )}
             <TextInput label="Number of backups to keep" inputMode="numeric" {...form.bind('backupKeepCount')} />
             <p className="small muted">
               A backup is made automatically every day while the system is open, and before every update.
@@ -319,14 +337,21 @@ function BackupSettings({ form }) {
               header: '',
               align: 'right',
               render: (f) => (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  icon={RotateCcw}
-                  onClick={() => setRestoreTarget({ fileName: f.fileName })}
-                >
-                  Restore
-                </Button>
+                <div className="row" style={{ justifyContent: 'flex-end', gap: 4 }}>
+                  {isOnlineVersion() && (
+                    <Button size="sm" variant="ghost" icon={Download} onClick={() => downloadBackup(f.fileName)}>
+                      Download
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={RotateCcw}
+                    onClick={() => setRestoreTarget({ fileName: f.fileName })}
+                  >
+                    Restore
+                  </Button>
+                </div>
               ),
             },
           ]}
@@ -363,7 +388,20 @@ function UpdateSettings() {
   if (!isDesktop) {
     return (
       <Card title="Software updates" icon={RefreshCw}>
-        <Alert tone="info">Updates are managed by the installed desktop application.</Alert>
+        {isOnlineVersion() ? (
+          <div className="stack" style={{ maxWidth: 560 }}>
+            <dl className="dl">
+              <dt>Running version</dt>
+              <dd>v{serverVersion()}</dd>
+            </dl>
+            <Alert tone="info">
+              This is the online version. Updates are installed on the server by your service provider, and your data is
+              backed up first. Reload the page (F5) after an update to see the new version.
+            </Alert>
+          </div>
+        ) : (
+          <Alert tone="info">Updates are managed by the installed desktop application.</Alert>
+        )}
       </Card>
     );
   }
@@ -434,7 +472,7 @@ function AboutSettings() {
     <Card title="About" icon={Info}>
       <dl className="dl">
         <dt>Application</dt>
-        <dd>Sriya Motors POS {info && `v${info.version}`}</dd>
+        <dd>Sriya Motors POS v{info?.version ?? serverVersion()}</dd>
         <dt>Company</dt>
         <dd>Sriya Motors (Pvt) Ltd</dd>
         {info && (

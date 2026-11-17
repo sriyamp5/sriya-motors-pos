@@ -258,6 +258,14 @@
 .banner-warning {
   background: var(--warning-soft);
 }
+.banner-danger {
+  background: var(--danger-soft);
+  color: var(--text);
+}
+.banner-danger svg {
+  color: var(--danger);
+  flex-shrink: 0;
+}
 .banner .btn {
   margin-left: auto;
 }

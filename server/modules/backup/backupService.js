@@ -4,7 +4,7 @@ import zlib from 'node:zlib';
 import { once } from 'node:events';
 import mysql from 'mysql2/promise';
 import { query, createMultiStatementConnection, getDbState, DB_STATUS } from '../../db/database.js';
-import { getConfig, paths } from '../../config/appConfig.js';
+import { getConfig, isWebMode, paths } from '../../config/appConfig.js';
 import { logger } from '../../core/logger.js';
 import { badRequest, notFound, AppError } from '../../core/errors.js';
 import { getSettings, setRawSetting, getRawSetting } from '../settings/settingsService.js';
@@ -44,8 +44,17 @@ function isWritableDir(dir) {
   }
 }
 
-/** Resolves the folder backups are written to, falling back to the default one. */
+/**
+ * Resolves the folder backups are written to, falling back to the default one.
+ * Online, the folder is fixed by the server (BACKUP_DIR) and cannot be changed
+ * from the browser.
+ */
 export async function resolveBackupDir() {
+  if (isWebMode()) {
+    const dir = process.env.BACKUP_DIR?.trim() || paths.defaultBackups();
+    fs.mkdirSync(dir, { recursive: true });
+    return { dir, usingFallback: false };
+  }
   const { backupDir } = await getSettings();
   const preferred = backupDir?.trim();
   if (preferred && isWritableDir(preferred)) return { dir: preferred, usingFallback: false };
@@ -168,6 +177,8 @@ export async function listBackups() {
 /** Resolves a backup by file name inside the backup folder, or by absolute path chosen in a file dialog. */
 async function resolveBackupPath({ fileName, filePath }) {
   if (filePath) {
+    // Only the desktop app has a file dialog; online, a path would point at the server's own disk.
+    if (isWebMode()) throw badRequest('Choose a backup from the list.');
     if (!filePath.endsWith(FILE_SUFFIX)) throw badRequest('Please select a Sriya Motors backup file (.sql.gz).');
     if (!fs.existsSync(filePath)) throw notFound('Backup file');
     return filePath;
@@ -177,6 +188,11 @@ async function resolveBackupPath({ fileName, filePath }) {
   const full = path.join(dir, safeName);
   if (!safeName.endsWith(FILE_SUFFIX) || !fs.existsSync(full)) throw notFound('Backup file');
   return full;
+}
+
+/** Full path of a backup in the backup folder, for downloading. */
+export async function getBackupFile(fileName) {
+  return resolveBackupPath({ fileName });
 }
 
 /**
