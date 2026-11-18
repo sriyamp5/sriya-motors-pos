@@ -314,6 +314,120 @@ export async function getStockValuation() {
   };
 }
 
+/** Units sold minus units returned per product since the given time. */
+const NET_SOLD_SINCE = `
+  SELECT si.product_id, SUM(si.quantity - si.returned_qty) AS qty
+    FROM sale_items si JOIN sales s ON s.id = si.sale_id
+   WHERE s.created_at >= ?
+   GROUP BY si.product_id`;
+
+/** Calendar date N days before today, as "YYYY-MM-DD 00:00:00" in local time. */
+function startOfDayDaysAgo(days) {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} 00:00:00`;
+}
+
+export const REORDER_SALES_DAYS = 30;
+
+/**
+ * Items at or below their low stock level, with what to order.
+ *
+ * Suggested quantity: enough to bring stock up to twice the low stock level,
+ * or to cover the last 30 days of sales if that is more. The last supplier
+ * and buying price come from the most recent goods received note.
+ */
+export async function getReorderList() {
+  const rows = await query(
+    `SELECT p.id, p.item_code, p.name, p.part_number, b.name AS brand_name, p.rack_location, p.unit,
+            p.stock_qty, p.reorder_level, p.cost_price,
+            COALESCE(sold.qty, 0) AS sold_recently,
+            lp.supplier_name, lp.unit_cost AS last_cost, lp.purchase_date AS last_purchase_date
+       FROM products p
+       LEFT JOIN brands b ON b.id = p.brand_id
+       LEFT JOIN (${NET_SOLD_SINCE}) sold ON sold.product_id = p.id
+       LEFT JOIN (
+         SELECT pi.product_id, sup.name AS supplier_name, pi.unit_cost, pu.purchase_date,
+                ROW_NUMBER() OVER (PARTITION BY pi.product_id ORDER BY pu.purchase_date DESC, pi.id DESC) AS rn
+           FROM purchase_items pi
+           JOIN purchases pu ON pu.id = pi.purchase_id
+           JOIN suppliers sup ON sup.id = pu.supplier_id
+       ) lp ON lp.product_id = p.id AND lp.rn = 1
+      WHERE p.is_active = 1 AND p.stock_qty <= p.reorder_level
+      ORDER BY lp.supplier_name IS NULL, lp.supplier_name, p.name
+      LIMIT 1000`,
+    [startOfDayDaysAgo(REORDER_SALES_DAYS)],
+  );
+
+  const items = camelizeAll(rows).map((r) => {
+    const soldRecently = Number(r.soldRecently);
+    const stock = Math.max(r.stockQty, 0);
+    const target = Math.max(r.reorderLevel * 2, soldRecently);
+    const suggestedQty = Math.max(target - stock, 1);
+    const unitCost = r.lastCost ?? r.costPrice;
+    return {
+      ...r,
+      soldRecently,
+      suggestedQty,
+      estimatedCost: fromCents(toCents(unitCost) * suggestedQty),
+    };
+  });
+
+  return {
+    salesDays: REORDER_SALES_DAYS,
+    items,
+    totals: {
+      itemCount: items.length,
+      outOfStock: items.filter((r) => r.stockQty <= 0).length,
+      estimatedCost: fromCents(items.reduce((acc, r) => acc + toCents(r.estimatedCost), 0)),
+    },
+  };
+}
+
+/**
+ * Items in stock that have not been sold in the last N days (or never sold
+ * since they were added more than N days ago), with the money held in them
+ * at buying price. Largest amounts first, so
+ * the items worth clearing with a discount or returning to the supplier
+ * are at the top.
+ */
+export async function getNonMovingStock({ days }) {
+  const rows = await query(
+    `SELECT p.id, p.item_code, p.name, p.part_number, b.name AS brand_name, c.name AS category_name,
+            p.rack_location, p.stock_qty, p.cost_price, p.selling_price, p.created_at,
+            p.stock_qty * p.cost_price AS cost_value,
+            ls.last_sold_at,
+            DATEDIFF(CURDATE(), DATE(COALESCE(ls.last_sold_at, p.created_at))) AS idle_days
+       FROM products p
+       JOIN categories c ON c.id = p.category_id
+       LEFT JOIN brands b ON b.id = p.brand_id
+       LEFT JOIN (
+         SELECT si.product_id, MAX(s.created_at) AS last_sold_at
+           FROM sale_items si JOIN sales s ON s.id = si.sale_id
+          GROUP BY si.product_id
+       ) ls ON ls.product_id = p.id
+      WHERE p.is_active = 1 AND p.stock_qty > 0
+        AND (ls.last_sold_at < ? OR (ls.last_sold_at IS NULL AND p.created_at < ?))
+      ORDER BY cost_value DESC, p.name
+      LIMIT 1000`,
+    // Items added during the period have not had a fair chance to sell yet, so they are left out.
+    [startOfDayDaysAgo(days), startOfDayDaysAgo(days)],
+  );
+
+  const items = camelizeAll(rows).map((r) => ({ ...r, idleDays: Number(r.idleDays) }));
+  return {
+    days,
+    items,
+    totals: {
+      itemCount: items.length,
+      neverSold: items.filter((r) => !r.lastSoldAt).length,
+      quantity: items.reduce((acc, r) => acc + r.stockQty, 0),
+      costValue: fromCents(items.reduce((acc, r) => acc + toCents(r.costValue), 0)),
+    },
+  };
+}
+
 /* ------------------------------------------------------- Cash closing --- */
 
 export async function getDaySummary(date) {

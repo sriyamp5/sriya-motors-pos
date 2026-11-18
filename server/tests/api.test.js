@@ -391,6 +391,62 @@ test('repeating a checkout with the same reference does not create a second sale
   assert.equal(badRef.status, 422);
 });
 
+test('reorder list and not-selling report are admin-only and consistent', async () => {
+  // A new item with stock that has never been sold, set below its low stock level.
+  const categories = await api('GET', '/categories/options', { token: adminToken });
+  const created = await api('POST', '/products', {
+    token: adminToken,
+    body: {
+      name: 'Slow Mover Test Bulb',
+      categoryId: categories.data[0].id,
+      partType: 'GENUINE',
+      unit: 'PCS',
+      costPrice: 200,
+      sellingPrice: 300,
+      openingStock: 2,
+      reorderLevel: 5,
+      rackLocation: 'Z-9',
+    },
+  });
+  assert.equal(created.status, 201, JSON.stringify(created.data));
+  const slowId = created.data.id;
+
+  const reorder = await api('GET', '/reports/reorder', { token: adminToken });
+  assert.equal(reorder.status, 200);
+  const line = reorder.data.items.find((r) => r.id === slowId);
+  assert.ok(line, 'item below its low stock level is on the reorder list');
+  assert.equal(line.suggestedQty, 8, 'brings stock up to twice the low stock level');
+  assert.equal(line.estimatedCost, 1600);
+  assert.equal(line.rackLocation, 'Z-9');
+
+  const fresh = await api('GET', '/reports/non-moving?days=30', { token: adminToken });
+  assert.equal(fresh.status, 200);
+  assert.ok(!fresh.data.items.some((r) => r.id === slowId), 'an item added today is not yet "not selling"');
+
+  // Pretend the item was added 40 days ago and has never sold since.
+  const db = await mysql.createConnection({
+    host: process.env.DB_HOST,
+    port: Number(process.env.DB_PORT),
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: TEST_DB,
+  });
+  await db.query('UPDATE products SET created_at = NOW() - INTERVAL 40 DAY WHERE id = ?', [slowId]);
+  await db.end();
+
+  const idle = await api('GET', '/reports/non-moving?days=30', { token: adminToken });
+  const slow = idle.data.items.find((r) => r.id === slowId);
+  assert.ok(slow, 'never-sold item is listed');
+  assert.equal(slow.lastSoldAt, null);
+  assert.equal(slow.costValue, 400);
+  assert.ok(!idle.data.items.some((r) => r.id === productId), 'an item sold today is not listed');
+
+  const badDays = await api('GET', '/reports/non-moving?days=1', { token: adminToken });
+  assert.equal(badDays.status, 422);
+  assert.equal((await api('GET', '/reports/reorder', { token: cashierToken })).status, 403);
+  assert.equal((await api('GET', '/reports/non-moving', { token: cashierToken })).status, 403);
+});
+
 test('items with history cannot be deleted, only deactivated', async () => {
   const del = await api('DELETE', `/products/${productId}`, { token: adminToken });
   assert.equal(del.status, 409);

@@ -64,6 +64,8 @@ The refund is calculated automatically, including any discounts on the original 
 | Correct stock after counting or damage | Stock adjustments → New adjustment |
 | See an item's stock history | Items → clock icon |
 | Sales, profit, price changes, staff, stock value | Reports |
+| What to order, and from which supplier | Reports → Reorder list |
+| Items that are not selling | Reports → Not selling |
 | Count cash at closing time | Day end |
 | Add cashiers or admins, reset passwords, deactivate staff | Users |
 | Who did what | Activity log |
@@ -76,6 +78,24 @@ In the item form, enter the buying price, type a markup % (for example 50) and c
 ### Low stock
 
 Each item has a **Low stock alert at** level. The red number next to **Items** in the menu and the **Needs restocking** list on the dashboard show items at or below that level. Use the stock filter on the Items screen to see them all.
+
+**Reports → Reorder list** turns this into an order list. It groups the items by the supplier they were last bought from and suggests an order quantity: enough to reach twice the low stock level, or the last 30 days of sales if that is more. It also shows the estimated cost at the last buying price. Use **Export to Excel (CSV)** to send it to a supplier.
+
+### Items that are not selling
+
+**Reports → Not selling** lists items in stock that have had no sale in the last 30, 60, 90, 180 or 365 days. The items holding the most money come first. It shows the rack, the units in stock, the money held at buying price and the date of the last sale. Items added during the period are left out until the period has passed. Use it to decide what to discount, return to the supplier or stop ordering.
+
+### Your stock at a glance
+
+| Question | Where to look |
+| --- | --- |
+| What items do we have, and how many of each? | Items (stock column, filter by category or brand) |
+| Where is each item kept? | Items → Rack column |
+| What does each item cost? | Items → buying price (admins only) |
+| How much profit does each item make? | Reports → Profit by item (choose the dates) |
+| What needs to be ordered? | Reports → Reorder list |
+| What is not selling? | Reports → Not selling |
+| How much money is held in stock? | Reports → Stock value |
 
 ## Updates
 

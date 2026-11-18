@@ -34,6 +34,23 @@ reportRoutes.get('/cashiers', adminOnly, async (req, res) => {
   res.json(await reportService.getCashierPerformance(parse(rangeSchema, req.query)));
 });
 
+reportRoutes.get('/reorder', adminOnly, async (_req, res) => {
+  res.json(await reportService.getReorderList());
+});
+
+const nonMovingSchema = z.object({
+  days: z.coerce
+    .number({ error: 'Enter the number of days' })
+    .int()
+    .min(7, 'At least 7 days')
+    .max(730, 'At most 730 days')
+    .default(90),
+});
+
+reportRoutes.get('/non-moving', adminOnly, async (req, res) => {
+  res.json(await reportService.getNonMovingStock(parse(nonMovingSchema, req.query)));
+});
+
 reportRoutes.get('/stock-valuation', adminOnly, async (_req, res) => {
   res.json(await reportService.getStockValuation());
 });
