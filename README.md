@@ -88,6 +88,7 @@ docs/              documentation
 - [Hosting online](docs/HOSTING.md): server, domain and HTTPS step by step (Hetzner + Cloudflare)
 - [Releases and automatic updates](docs/RELEASES_AND_UPDATES.md)
 - [Backup and restore](docs/BACKUP_AND_RESTORE.md)
+- [Importing vehicles, brands and items from Excel](docs/IMPORTING_ITEMS.md)
 - [User guide](docs/USER_GUIDE.md) for shop staff
 - [Development guide](docs/DEVELOPMENT.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
